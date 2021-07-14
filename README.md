@@ -20,7 +20,7 @@ Let's assume that we have to ensure only the images that have valid signatures c
 
 This is what we want to achieve at the end of the day:
 
-[<img src="./.res/arch.png" width=75%/>](./.res/arch.png)
+[<img src="./.res/arch.png" width=100%/>](./.res/arch.png)
 
 ### Prerequisites
 
