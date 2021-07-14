@@ -1,5 +1,7 @@
 # Sign Container Images with cosign and Verify signature by using Open Policy Agent (OPA)
 
+![demo](./.res/demo.gif)
+
 In the beginning, I believe it is worth saying that this project is just a proof-of-concept project that shows people how they can use cosign and OPA (Open Policy Agent) together to implement the signing and verifying container image process together.
 
 In most basic form, [cosign](https://github.com/sigstore/cosign) is a container signing tool; it helps us to sign and verify container images by using the signature algorithm (ECDSA-P256) and payload format ([Red Hat Simple Signing](https://www.redhat.com/en/blog/container-image-signing)).
@@ -108,3 +110,12 @@ Pushing signature to: ...
 $ curl -X POST :8181/v1/data/signature/verified -H "Content-Type: application/json" -d "@input.json"
 {"result":true}
 ```
+
+
+## Furthermore
+
+You should notice that we worked on the local environment to make that happen; of course, there is an alternative way of implementing this kind of demonstration. You can do the same in the Kubernetes environment. To do that, you can use OPA Gatekeeper, which is a customizable AdmissionWebhook, instead of using just OPA in the bare minimum and running `cosign-http-wrapper` as a `Pod.`
+
+## Conclusion
+
+You can implement a way of protecting Kubernetes clusters from an unsigned image by just using cosign and OPA seamlessly.
