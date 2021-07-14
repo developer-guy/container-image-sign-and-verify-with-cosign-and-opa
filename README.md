@@ -38,13 +38,13 @@ This is what we want to achieve at the end of the day:
 package signature
 ```
 
-2. Define the `verified` flag:
+2. Assign default value to the `verified` rule:
 
 ```rego
 default verified = false
 ```
 
-3. Define the rule:
+3. Create the rule body:
 
 ```rego
 verified {
