@@ -30,7 +30,7 @@ This is what we want to achieve at the end of the day:
 
 ### Demonstration
 
-#### 0. Creating sample Rego Policy
+#### Create sample Rego Policy
 
 1. Define the `package`:
 
@@ -65,7 +65,7 @@ verified {
 
 **P.S:** In this demo, we used the `http`, and ignored the `authentication` process. Better use the `https`.
 
-#### 1. Run the OPA Server with pre-loaded [Rego policies](rego)
+#### Run the OPA Server with pre-loaded [Rego policies](rego)
 
 ```bash
 $ opa run --server rego
@@ -73,13 +73,13 @@ $ opa run --server rego
 {"addrs":[":8181"],"diagnostic-addrs":[],"level":"info","msg":"Initializing server.","time":"2021-07-14T23:19:49+03:00"}
 ```
 
-#### 2. Generate Key-Pair using Cosign
+#### Generate Key-Pair using Cosign
 
 ```bash
 $ cosign generate-key-pair
 ```
 
-#### 3. Test with an Image
+#### Test
 
 `input.json`:
 
