@@ -1,0 +1,16 @@
+{
+    "builder": { "id": "in_toto:furkans"}, 
+    "recipe": {
+      "type": "https://example.com/Makefile",
+      "definedInMaterial": 0,      
+      "entryPoint": "src:foo", 
+      "arguments": {"CFLAGS": "-O3"}         
+    },
+    "metadata": {
+      "buildInvocationId": "test"
+    },
+    "materials": [{
+      "uri": "https://example.com/example-1.2.3.tar.gz",
+      "digest": {"sha256": "1234..."}
+    }]
+}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/sigstore/sigstore/pkg/signature/dsse"
 	"log"
 	"net/http"
 	"os"
@@ -23,6 +24,7 @@ type VerificationReq struct {
 type VerificationResp struct {
 	Verified            bool   `json:"verified"`
 	VerificationMessage string `json:"verification_message"`
+	Payload             string `json:"payload"`
 }
 
 func VerifySig(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
@@ -41,7 +43,7 @@ func VerifySig(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 		return
 	}
 
-	key, err := cosign.LoadPublicKey(ctx, filepath.Join(wDir, "cosign.pub"))
+	key, err := cli.LoadPublicKey(ctx, filepath.Join(wDir, "cosign.pub"))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -54,13 +56,13 @@ func VerifySig(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	}
 
 	co := &cosign.CheckOpts{
-		RootCerts:   fulcio.Roots,
-		SigVerifier: key,
-		Claims:      true,
+		RootCerts:          fulcio.Roots,
+		SigVerifier:        key,
+		RegistryClientOpts: cli.DefaultRegistryClientOpts(ctx),
 	}
 
 	var resp VerificationResp
-	if _, err = cosign.Verify(ctx, ref, co); err != nil {
+	if verified, err := cosign.Verify(ctx, ref, co); err != nil {
 		resp = VerificationResp{
 			Verified:            false,
 			VerificationMessage: err.Error(),
@@ -69,6 +71,7 @@ func VerifySig(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 		resp = VerificationResp{
 			Verified:            true,
 			VerificationMessage: fmt.Sprintf("valid signatures found for an image: %s", body.Image),
+			Payload:             string(verified[0].Payload),
 		}
 	}
 
@@ -108,13 +111,25 @@ func VerifyAttest(w http.ResponseWriter, r *http.Request, ps httprouter.Params) 
 		return
 	}
 
+	sigRepo, err := cli.TargetRepositoryForImage(ref)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	co := &cosign.CheckOpts{
 		RootCerts:            fulcio.Roots,
 		RegistryClientOpts:   cli.DefaultRegistryClientOpts(ctx),
+		ClaimVerifier:        cosign.IntotoSubjectClaimVerifier,
+		SigTagSuffixOverride: cosign.AttestationTagSuffix,
 	}
-	co.SigVerifier = verifier
+
+	co.SigVerifier = dsse.WrapVerifier(verifier)
+	co.SignatureRepo = sigRepo
+	co.VerifyBundle = false
+
 	var resp VerificationResp
-	if _, err = cosign.Verify(ctx, ref, co); err != nil {
+	if verified, err := cosign.Verify(ctx, ref, co); err != nil {
 		resp = VerificationResp{
 			Verified:            false,
 			VerificationMessage: err.Error(),
@@ -123,6 +138,7 @@ func VerifyAttest(w http.ResponseWriter, r *http.Request, ps httprouter.Params) 
 		resp = VerificationResp{
 			Verified:            true,
 			VerificationMessage: fmt.Sprintf("valid signatures found for an image: %s", body.Image),
+			Payload:             string(verified[0].Payload),
 		}
 	}
 

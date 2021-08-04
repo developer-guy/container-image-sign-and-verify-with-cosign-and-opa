@@ -1,4 +1,4 @@
-# Sign Container Images with cosign and Verify signature by using Open Policy Agent (OPA)
+# Sign Container Images with cosign and Verify Attestation by using Open Policy Agent (OPA)
 
 ![demo](./.res/demo.gif)
 
