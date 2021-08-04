@@ -4,17 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/sigstore/sigstore/pkg/signature/dsse"
-	"log"
-	"net/http"
-	"os"
-	"path/filepath"
-
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/julienschmidt/httprouter"
 	"github.com/sigstore/cosign/cmd/cosign/cli"
 	"github.com/sigstore/cosign/cmd/cosign/cli/fulcio"
 	"github.com/sigstore/cosign/pkg/cosign"
+	"github.com/sigstore/sigstore/pkg/signature/dsse"
+	"log"
+	"net/http"
+	"os"
+	"path/filepath"
 )
 
 type VerificationReq struct {
@@ -24,7 +23,7 @@ type VerificationReq struct {
 type VerificationResp struct {
 	Verified            bool   `json:"verified"`
 	VerificationMessage string `json:"verification_message"`
-	Payload             string `json:"payload"`
+	Payload             []byte `json:"payload"`
 }
 
 func VerifySig(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
@@ -71,7 +70,7 @@ func VerifySig(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 		resp = VerificationResp{
 			Verified:            true,
 			VerificationMessage: fmt.Sprintf("valid signatures found for an image: %s", body.Image),
-			Payload:             string(verified[0].Payload),
+			Payload:             verified[0].Payload,
 		}
 	}
 
@@ -135,10 +134,17 @@ func VerifyAttest(w http.ResponseWriter, r *http.Request, ps httprouter.Params) 
 			VerificationMessage: err.Error(),
 		}
 	} else {
-		resp = VerificationResp{
-			Verified:            true,
-			VerificationMessage: fmt.Sprintf("valid signatures found for an image: %s", body.Image),
-			Payload:             string(verified[0].Payload),
+		if err != nil {
+			resp = VerificationResp{
+				Verified:            false,
+				VerificationMessage: err.Error(),
+			}
+		} else {
+			resp = VerificationResp{
+				Verified:            true,
+				VerificationMessage: fmt.Sprintf("valid signatures found for an image: %s", body.Image),
+				Payload:             verified[0].Payload,
+			}
 		}
 	}
 

@@ -1,12 +1,14 @@
-# Sign Container Images with cosign and Verify Attestation by using Open Policy Agent (OPA)
+# Sign Attestation with cosign and Verify Attestation and its claims by using Open Policy Agent (OPA)
 
-![demo](./.res/demo.gif)
+![sign_attestation](.res/sign_attestation.png)
 
-In the beginning, I believe it is worth saying that this project is just a proof-of-concept project that shows people how they can use cosign and OPA (Open Policy Agent) together to implement the signing and verifying container image process together.
+> Credit: https://dlorenc.medium.com/policy-and-attestations-89650fd6f4fa
 
-In most basic form, [cosign](https://github.com/sigstore/cosign) is a container signing tool; it helps us to sign and verify container images by using the signature algorithm (ECDSA-P256) and payload format ([Red Hat Simple Signing](https://www.redhat.com/en/blog/container-image-signing)).
+In the beginning, I believe it is worth saying that this project is just a proof-of-concept project that shows people how they can use cosign and OPA (Open Policy Agent) together to implement the signing and verifying attestations.
 
-[Dan Lorenc](https://twitter.com/lorenc_dan), who is one of the maintainers of the project, wrote an excellent article about what cosign is and the motivation behind it; you can follow the [link](https://blog.sigstore.dev/cosign-signed-container-images-c1016862618) to access it.
+[cosign](https://github.com/sigstore/cosign) can help us to sign and verify attestations based on [in-toto attestation specs](https://github.com/in-toto/attestation).
+
+[Dan Lorenc](https://twitter.com/lorenc_dan), who is one of the maintainers of the project, wrote an excellent article about what Policy and Attestations are and the motivation behind it; you can follow the [link](https://dlorenc.medium.com/policy-and-attestations-89650fd6f4fa) to access it.
 
 On the other hand side, the Open Policy Agent (OPA, pronounced "oh-pa") is an open-source, general-purpose policy engine that unifies policy enforcement across the stack. So, the motivation behind using this kind of policy engine is providing an easy way of enforcing organizational policies across the stack.
 
@@ -24,9 +26,9 @@ This is what we want to achieve at the end of the day:
 
 ### Prerequisites
 
-* [go v1.16.5](https://github.com/golang/go)
-* [opa v0.30.2](https://github.com/open-policy-agent/opa)
-* [cosign v0.6.0](https://github.com/sigstore/cosign)
+* [go v1.16.6](https://github.com/golang/go)
+* [opa v0.31.0](https://github.com/open-policy-agent/opa)
+* [cosign v1.0.0](https://github.com/sigstore/cosign)
 
 ### Demonstration
 
@@ -38,28 +40,25 @@ This is what we want to achieve at the end of the day:
 package signature
 ```
 
-2. Assign default value to the `verified` rule:
+2. Assign default value to the `allow_attestation` rule:
 
 ```rego
-default verified = false
+default allow_attestation = false
 ```
 
 3. Create the rule body:
 
 ```rego
-verified {
-    # read the `image` from the `input` that will be verified
-    body := { "image": input.image }
-    
-    # hardcoded consts
-    headers_json := { "Content-Type": "application/json" }
-    cosignHTTPWrapperURL := "http://localhost:8080/verify"
-
+allow_attestation {
     # send HTTP POST request to cosign-wrapper
+    body := {
+    	"image": input.image,
+    }
+    headers_json := {"Content-Type": "application/json"}
+    cosignHTTPWrapperURL := "http://localhost:8080/verify-attestation"
     output := http.send({"method": "post", "url": cosignHTTPWrapperURL, "headers": headers_json, "body": body})
-    
-    # check if result verified
-    output.body.verified
+    p := json.unmarshal(base64.decode(output.body.payload))
+    contains(p.predicate.Data, "{ \"id\": \"internal ci/cd platform\"}") # we are checking the image's builder id
 }
 ```
 
@@ -68,49 +67,56 @@ verified {
 #### Run the OPA Server with pre-loaded [Rego policies](rego)
 
 ```bash
-$ opa run --server rego
+$ opa run --server rego/attestation_verify.rego
 
 {"addrs":[":8181"],"diagnostic-addrs":[],"level":"info","msg":"Initializing server.","time":"2021-07-14T23:19:49+03:00"}
 ```
 
-#### Generate Key-Pair using Cosign
+#### Upload your attestation file
+
+Here is the attestation file that fits into [Provenance spec](https://github.com/in-toto/attestation/blob/main/spec/predicates/provenance.md) of in-toto's attestation specs.
+```json
+{
+    "builder": { "id": "internal ci/cd platform"}, 
+    "recipe": {
+      "type": "https://example.com/Makefile",
+      "definedInMaterial": 0,      
+      "entryPoint": "src:foo", 
+      "arguments": {"CFLAGS": "-O3"}         
+    },
+    "metadata": {
+      "buildInvocationId": "test"
+    },
+    "materials": [{
+      "uri": "https://example.com/example-1.2.3.tar.gz",
+      "digest": {"sha256": "1234..."}
+    }]
+}
+```
+
 
 ```bash
-$ cosign generate-key-pair
+$ cosign attest -predicate myfirstattestation -key cosign.key devopps/alpine:3.12.1
 ```
+
 
 #### Test
 
 `input.json`:
 
 ```json
-{ "input": { "image": "gcr.io/developerguy-311909/ubuntu:unsigned"} }
+{ "input": { "image": "devopps/alpine:3.12.1"} }
 ```
 
-* Test with _unsigned_ image:
+* Test rule:
 
 ```bash
-$ curl -X POST :8181/v1/data/signature/verified -H "Content-Type: application/json" -d "@input.json"
-{"result":false}
+$ curl -X POST :8181/v1/data/signature/allow_attestation -H "Content-Type: application/json" -d "@input.json"
+{"result":true}
 
 # OPA Log
 {"client_addr":"[::1]:62078","level":"info","msg":"Sent response.","req_id":2,"req_method":"POST","req_path":"/v1/data/signature/verified","resp_bytes":16,"resp_duration":2.107975,"resp_status":200,"time":"2021-07-14T23:22:47+03:00"}
 ```
-
-* Sign:
-
-```bash
-$ cosign sign -key cosign.key $IMAGE
-Pushing signature to: ...
-```
-
-* Test with _signed_ image:
-
-```bash
-$ curl -X POST :8181/v1/data/signature/verified -H "Content-Type: application/json" -d "@input.json"
-{"result":true}
-```
-
 
 ## Furthermore
 

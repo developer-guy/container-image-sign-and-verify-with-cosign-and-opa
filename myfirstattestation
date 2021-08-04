@@ -1,5 +1,5 @@
 {
-    "builder": { "id": "in_toto:furkans"}, 
+    "builder": { "id": "internal ci/cd platform"},
     "recipe": {
       "type": "https://example.com/Makefile",
       "definedInMaterial": 0,      
